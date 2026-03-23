@@ -242,7 +242,14 @@ export default function App() {
   }, [handleSwipe]);
 
   const handleSoundCloudSubmit = useCallback((track) => {
-    setTracks(prev => [track, ...prev]);
+    // Clear cache so next load fetches fresh
+    localStorage.removeItem('tsh_tracks_cache');
+    // Add to current state immediately
+    setTracks(prev => {
+      const updated = [track, ...prev];
+      localStorage.setItem('tsh_tracks_cache', JSON.stringify(updated));
+      return updated;
+    });
     setQueue(prev => [track, ...prev]);
     setShowUpload(false);
     showToast("🔥 TRACK DROPPED!");
