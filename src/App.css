@@ -965,6 +965,65 @@ body {
   font-size: 14px;
 }
 
+/* ===== TRACK UPLOAD ===== */
+.upload-file-box {
+  border: 3px dashed #333;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  margin-bottom: 14px;
+  transition: border-color 0.2s;
+  font-family: var(--font-vt);
+  font-size: 16px;
+  color: var(--text-dim);
+}
+.upload-file-box:hover { border-color: var(--pink); color: var(--text); }
+.upload-file-icon { font-size: 36px; margin-bottom: 8px; }
+.upload-file-hint { font-size: 13px; color: #555; margin-top: 4px; }
+.upload-file-selected {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  color: var(--green);
+  justify-content: center;
+}
+.upload-file-size { color: #555; font-size: 13px; }
+
+.upload-cover-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.upload-cover-preview {
+  width: 90px;
+  height: 90px;
+  border: 2px solid #333;
+  cursor: pointer;
+  flex-shrink: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.upload-cover-preview img { width: 100%; height: 100%; object-fit: cover; }
+.upload-cover-empty {
+  font-size: 12px;
+  color: #555;
+  text-align: center;
+  font-family: var(--font-vt);
+}
+.upload-meta { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.upload-progress {
+  font-family: var(--font-pixel);
+  font-size: 9px;
+  color: var(--yellow);
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+  animation: pulse 1s ease-in-out infinite alternate;
+}
+@keyframes pulse { from { opacity: 0.5; } to { opacity: 1; } }
+
 /* ===== WAVEFORM ===== */
 .waveform-visualizer { background: transparent; }
 

@@ -10,7 +10,7 @@ import TrackModal from "./TrackModal.jsx";
 import Background from "./Background.jsx";
 import ReactionPicker from "./ReactionPicker.jsx";
 import GraffitiLogo from "./GraffitiLogo.jsx";
-import SoundCloudUpload from "./SoundCloudUpload.jsx";
+import TrackUpload from "./TrackUpload.jsx";
 import { FireAnimation, TrashAnimation } from "./SwipeAnimations.jsx";
 import tracksData from "./tracks.js";
 import { supabase } from "./supabase.js";
@@ -423,7 +423,7 @@ export default function App() {
       {showUpload && (
         <div className="modal-overlay" onClick={() => setShowUpload(false)}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
-            <SoundCloudUpload
+            <TrackUpload
               onSubmit={handleSoundCloudSubmit}
               onCancel={() => setShowUpload(false)}
             />
