@@ -113,14 +113,7 @@ export default function App() {
       // Clear any stale cache
       localStorage.removeItem('tsh_tracks_cache');
       try {
-        // Check if needs seeding
-        const { count } = await supabase.from('tracks').select('*', { count: 'exact', head: true });
-        if (count === 0) {
-          const seedData = tracksData.map(mapTrackToDb);
-          await supabase.from('tracks').insert(seedData);
-        }
-
-        // Fetch fresh tracks
+        // Fetch fresh tracks — no seeding, only real uploads
         const { data, error } = await supabase.from('tracks').select('*').order('listed_at', { ascending: false });
         if (error) throw error;
 
