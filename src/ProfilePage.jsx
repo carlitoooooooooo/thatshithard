@@ -47,7 +47,7 @@ export default function ProfilePage({ userVotes, tracks }) {
     supabase
       .from('tracks')
       .select('*')
-      .eq('uploaded_by', currentUser.id)
+      .eq('uploaded_by_username', currentUser.username)
       .order('listed_at', { ascending: false })
       .then(({ data, error }) => {
         if (!error && data) {
