@@ -23,17 +23,21 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let settled = false;
 
+    // Show cached session immediately while we verify with Supabase
+    try {
+      const saved = localStorage.getItem(SESSION_KEY);
+      if (saved) {
+        setCurrentUser(JSON.parse(saved));
+        setAuthLoading(false); // show app instantly from cache
+      }
+    } catch {}
+
     const fallbackTimer = setTimeout(() => {
       if (!settled) {
         settled = true;
-        // Try localStorage as fallback
-        try {
-          const saved = localStorage.getItem(SESSION_KEY);
-          if (saved) setCurrentUser(JSON.parse(saved));
-        } catch {}
         setAuthLoading(false);
       }
-    }, 8000);
+    }, 3000); // reduced from 8s to 3s
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (settled) return;

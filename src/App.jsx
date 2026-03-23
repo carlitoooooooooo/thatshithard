@@ -98,39 +98,38 @@ export default function App() {
   const [showUpload, setShowUpload] = useState(false);
   const toastTimer = useRef(null);
 
-  // Load tracks from Supabase and seed if empty
+  // Load tracks — show cached instantly, then refresh in background
   useEffect(() => {
     async function loadTracks() {
-      setTracksLoading(true);
-      setTracksError(null);
-      try {
-        // Check count first
-        const { count } = await supabase
-          .from('tracks')
-          .select('*', { count: 'exact', head: true });
+      // Show cached tracks instantly
+      const cached = localStorage.getItem('tsh_tracks_cache');
+      if (cached) {
+        try {
+          setTracks(JSON.parse(cached));
+          setTracksLoading(false);
+        } catch {}
+      }
 
+      try {
+        // Check if needs seeding
+        const { count } = await supabase.from('tracks').select('*', { count: 'exact', head: true });
         if (count === 0) {
-          // Seed the DB
           const seedData = tracksData.map(mapTrackToDb);
-          const { error: seedError } = await supabase.from('tracks').insert(seedData);
-          if (seedError) console.error('Seed error:', seedError);
+          await supabase.from('tracks').insert(seedData);
         }
 
-        // Fetch all tracks
-        const { data, error } = await supabase
-          .from('tracks')
-          .select('*')
-          .order('listed_at', { ascending: false });
-
+        // Fetch fresh tracks
+        const { data, error } = await supabase.from('tracks').select('*').order('listed_at', { ascending: false });
         if (error) throw error;
 
         const mapped = (data || []).map(mapTrack);
         setTracks(mapped);
+        localStorage.setItem('tsh_tracks_cache', JSON.stringify(mapped));
       } catch (err) {
-        console.error('Load tracks error:', err);
-        setTracksError(err.message || 'Failed to load tracks');
-        // Fall back to static data
-        setTracks(tracksData.map(t => ({ ...t, coverUrl: t.coverUrl, audioUrl: t.audioUrl, listedAt: t.listedAt, uploadedBy: t.uploadedBy })));
+        // Fall back to static data if no cache
+        if (!localStorage.getItem('tsh_tracks_cache')) {
+          setTracks(tracksData.map(t => ({ ...t, coverUrl: t.coverUrl, audioUrl: t.audioUrl, listedAt: t.listedAt, uploadedBy: t.uploadedBy })));
+        }
       } finally {
         setTracksLoading(false);
       }

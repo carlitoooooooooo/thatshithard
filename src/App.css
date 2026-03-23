@@ -1,5 +1,6 @@
 /* ===== GOOGLE FONTS ===== */
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+/* fonts load async — UI shows immediately with fallbacks */
 
 /* ===== CSS VARIABLES ===== */
 :root {
