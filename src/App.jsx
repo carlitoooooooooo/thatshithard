@@ -98,18 +98,12 @@ export default function App() {
   const [showUpload, setShowUpload] = useState(false);
   const toastTimer = useRef(null);
 
-  // Load tracks — show cached instantly, then refresh in background
+  // Load tracks — always fetch fresh from DB, no cache
   useEffect(() => {
     async function loadTracks() {
-      // Show cached tracks instantly
-      const cached = localStorage.getItem('tsh_tracks_cache');
-      if (cached) {
-        try {
-          setTracks(JSON.parse(cached));
-          setTracksLoading(false);
-        } catch {}
-      }
-
+      setTracksLoading(true);
+      // Clear any stale cache
+      localStorage.removeItem('tsh_tracks_cache');
       try {
         // Check if needs seeding
         const { count } = await supabase.from('tracks').select('*', { count: 'exact', head: true });
@@ -124,12 +118,10 @@ export default function App() {
 
         const mapped = (data || []).map(mapTrack);
         setTracks(mapped);
-        localStorage.setItem('tsh_tracks_cache', JSON.stringify(mapped));
       } catch (err) {
-        // Fall back to static data if no cache
-        if (!localStorage.getItem('tsh_tracks_cache')) {
-          setTracks(tracksData.map(t => ({ ...t, coverUrl: t.coverUrl, audioUrl: t.audioUrl, listedAt: t.listedAt, uploadedBy: t.uploadedBy })));
-        }
+        console.error('Load tracks error:', err);
+        // Fall back to static data
+        setTracks(tracksData.map(t => ({ ...t, coverUrl: t.coverUrl, audioUrl: t.audioUrl, listedAt: t.listedAt, uploadedBy: t.uploadedBy })));
       } finally {
         setTracksLoading(false);
       }
@@ -242,15 +234,9 @@ export default function App() {
   }, [handleSwipe]);
 
   const handleSoundCloudSubmit = useCallback((track) => {
-    // Clear cache so next load fetches fresh
-    localStorage.removeItem('tsh_tracks_cache');
-    // Add to current state immediately
-    setTracks(prev => {
-      const updated = [track, ...prev];
-      localStorage.setItem('tsh_tracks_cache', JSON.stringify(updated));
-      return updated;
-    });
-    setQueue(prev => [track, ...prev]);
+    // Add to tracks + force it into queue regardless of seen status
+    setTracks(prev => [track, ...prev]);
+    setQueue(prev => [track, ...prev]); // always prepend to queue so it shows up first
     setShowUpload(false);
     showToast("🔥 TRACK DROPPED!");
   }, [showToast]);
