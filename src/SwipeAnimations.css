@@ -1,0 +1,103 @@
+/* ============================
+   FIRE ANIMATION (swipe right)
+   ============================ */
+.fire-container {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 200;
+}
+
+.fire-particle {
+  position: absolute;
+  border-radius: 50% 50% 20% 20%;
+  animation: fireRise linear forwards;
+  transform-origin: center bottom;
+}
+
+@keyframes fireRise {
+  0%   { transform: translateY(0) scale(1) rotate(0deg);   opacity: 1; }
+  60%  { transform: translateY(-80px) scale(1.2) rotate(10deg); opacity: 0.8; }
+  100% { transform: translateY(-160px) scale(0.2) rotate(25deg); opacity: 0; }
+}
+
+.fire-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 3px solid #ff6600;
+  animation: fireRingExpand 0.5s ease-out forwards;
+}
+
+@keyframes fireRingExpand {
+  0%   { transform: scale(0.2); opacity: 1; }
+  100% { transform: scale(3);   opacity: 0; }
+}
+
+/* ============================
+   TRASH CAN ANIMATION (swipe left)
+   ============================ */
+.trash-container {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: trashBounceIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes trashBounceIn {
+  0%   { transform: translateX(-50%) scale(0.3); opacity: 0; }
+  100% { transform: translateX(-50%) scale(1);   opacity: 1; }
+}
+
+.trash-can {
+  font-size: 64px;
+  filter: drop-shadow(0 0 12px rgba(255, 45, 120, 0.8));
+  animation: trashShake 0.15s ease-in-out 0.15s 2 alternate;
+}
+
+@keyframes trashShake {
+  0%   { transform: rotate(-8deg); }
+  100% { transform: rotate(8deg);  }
+}
+
+.trash-lid {
+  position: absolute;
+  top: -18px;
+  font-size: 40px;
+  animation: lidFly 0.3s ease-out 0.1s forwards;
+  transform-origin: left center;
+}
+
+@keyframes lidFly {
+  0%   { transform: rotate(0deg)   translateY(0);    opacity: 1; }
+  100% { transform: rotate(-60deg) translateY(-30px); opacity: 0; }
+}
+
+.trash-label {
+  font-family: 'VT323', monospace;
+  font-size: 20px;
+  color: #ff2d78;
+  letter-spacing: 2px;
+  margin-top: 6px;
+  animation: trashLabelPop 0.3s ease-out forwards;
+}
+
+@keyframes trashLabelPop {
+  0%   { transform: scale(0); opacity: 0; }
+  60%  { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1);   opacity: 1; }
+}
+
+.trash-fadeout {
+  animation: trashFadeOut 0.3s ease-in forwards;
+}
+
+@keyframes trashFadeOut {
+  0%   { opacity: 1; transform: translateX(-50%) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) scale(0.5) translateY(20px); }
+}
