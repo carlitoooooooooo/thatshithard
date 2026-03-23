@@ -1040,15 +1040,27 @@ body {
   font-family: var(--font-vt);
 }
 .upload-meta { flex: 1; display: flex; flex-direction: column; gap: 8px; }
-.upload-progress {
+.upload-progress-wrap {
+  margin-bottom: 12px;
+}
+.upload-progress-label {
   font-family: var(--font-pixel);
   font-size: 9px;
   color: var(--yellow);
   letter-spacing: 1px;
-  margin-bottom: 8px;
-  animation: pulse 1s ease-in-out infinite alternate;
+  margin-bottom: 6px;
 }
-@keyframes pulse { from { opacity: 0.5; } to { opacity: 1; } }
+.upload-progress-bar {
+  height: 8px;
+  background: #222;
+  border: 2px solid #333;
+  overflow: hidden;
+}
+.upload-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--pink), var(--yellow));
+  transition: width 0.2s ease;
+}
 
 /* ===== WAVEFORM ===== */
 .waveform-visualizer { background: transparent; }

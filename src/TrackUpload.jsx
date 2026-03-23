@@ -4,6 +4,34 @@ import { supabase } from "./supabase.js";
 
 const GENRES = ["Hip-Hop", "R&B", "Drill", "Trap", "Afrobeats", "Jersey Club", "Hyperpop", "Indie", "Electronic", "Soul"];
 const MAX_FILE_MB = 20;
+const SUPABASE_URL = 'https://bkapxykeryzxbqpgjgab.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJrYXB4eWtlcnl6eGJxcGdqZ2FiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyODE3NzgsImV4cCI6MjA4OTg1Nzc3OH0.-URU57ytulm82gnYfpSrOQ_i0e7qlwk0LKfGokDXmWA';
+
+// Upload with progress tracking using XMLHttpRequest
+function uploadWithProgress(bucket, path, file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const url = `${SUPABASE_URL}/storage/v1/object/${bucket}/${path}`;
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    xhr.setRequestHeader('Authorization', `Bearer ${SUPABASE_ANON_KEY}`);
+    xhr.setRequestHeader('x-upsert', 'true');
+    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(`${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`);
+      } else {
+        reject(new Error(`Upload failed: ${xhr.status} ${xhr.responseText}`));
+      }
+    };
+    xhr.onerror = () => reject(new Error('Upload failed — network error'));
+    xhr.send(file);
+  });
+}
 
 function buildSCEmbedUrl(trackUrl) {
   return `https://w.soundcloud.com/player/?url=${encodeURIComponent(trackUrl)}&color=%23ff2d78&auto_play=false&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false&visual=true`;
@@ -33,6 +61,7 @@ function MP3Tab({ onSubmit, onCancel }) {
   const [coverPreview, setCoverPreview] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState("");
+  const [uploadPct, setUploadPct] = useState(0);
   const [error, setError] = useState("");
   const audioRef = useRef(null);
   const coverRef = useRef(null);
@@ -61,19 +90,20 @@ function MP3Tab({ onSubmit, onCancel }) {
 
     try {
       setProgress("Uploading audio...");
+      setUploadPct(0);
       const audioExt = audioFile.name.split(".").pop();
       const audioPath = `${currentUser.id}/${Date.now()}.${audioExt}`;
-      const { error: ae } = await supabase.storage.from("audio").upload(audioPath, audioFile, { contentType: audioFile.type });
-      if (ae) throw new Error(ae.message);
-      const audioUrl = supabase.storage.from("audio").getPublicUrl(audioPath).data.publicUrl;
+      const audioUrl = await uploadWithProgress("audio", audioPath, audioFile, (pct) => setUploadPct(pct));
 
       let coverUrl = "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80";
       if (coverFile) {
         setProgress("Uploading cover...");
+        setUploadPct(0);
         const coverExt = coverFile.name.split(".").pop();
         const coverPath = `${currentUser.id}/cover_${Date.now()}.${coverExt}`;
-        const { error: ce } = await supabase.storage.from("covers").upload(coverPath, coverFile, { contentType: coverFile.type });
-        if (!ce) coverUrl = supabase.storage.from("covers").getPublicUrl(coverPath).data.publicUrl;
+        try {
+          coverUrl = await uploadWithProgress("covers", coverPath, coverFile, (pct) => setUploadPct(pct));
+        } catch {} // cover is optional
       }
 
       setProgress("Saving...");
@@ -131,10 +161,18 @@ function MP3Tab({ onSubmit, onCancel }) {
       </div>
 
       {error && <div className="sc-upload__error">{error}</div>}
-      {progress && <div className="upload-progress">{progress}</div>}
+
+      {uploading && (
+        <div className="upload-progress-wrap">
+          <div className="upload-progress-label">{progress} {uploadPct}%</div>
+          <div className="upload-progress-bar">
+            <div className="upload-progress-fill" style={{ width: `${uploadPct}%` }} />
+          </div>
+        </div>
+      )}
 
       <button className="btn-bevel btn-pink sc-upload__submit" onClick={handleSubmit} disabled={uploading || !audioFile || !title.trim()}>
-        {uploading ? progress || "UPLOADING..." : "🔥 PUT IT ON THE BLOCK"}
+        {uploading ? "UPLOADING..." : "🔥 PUT IT ON THE BLOCK"}
       </button>
     </div>
   );
