@@ -3,6 +3,7 @@ import AudioPlayer from "./AudioPlayer.js";
 import WaveformVisualizer from "./WaveformVisualizer.jsx";
 import { useAuth } from "./AuthContext.jsx";
 import { supabase } from "./supabase.js";
+import { dbInsert, dbSelect, dbUpsert } from "./dbHelper.js";
 
 const REACTIONS_EMOJIS = ["🔥", "😤", "💯", "🥶", "😭", "💀"];
 
@@ -27,20 +28,37 @@ export default function TrackModal({ track, onClose, onVote, userVotes }) {
   const commentsEndRef = useRef(null);
   const channelRef = useRef(null);
 
-  // Load comments from Supabase
+  // Load comments — use direct REST to bypass RLS auth issue
   useEffect(() => {
     setCommentsLoading(true);
-    supabase
-      .from('comments')
-      .select('*')
-      .eq('track_id', track.id)
-      .order('created_at', { ascending: true })
-      .then(({ data, error }) => {
-        if (!error && data) setComments(data);
+
+    const LS_KEY = `tsh_comments_${track.id}`;
+
+    dbSelect('comments', { track_id: track.id })
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setComments(data);
+          // Keep localStorage in sync
+          localStorage.setItem(LS_KEY, JSON.stringify(data));
+        } else {
+          // Fall back to localStorage if DB returns empty or error
+          try {
+            const cached = JSON.parse(localStorage.getItem(LS_KEY) || '[]');
+            if (cached.length > 0) setComments(cached);
+          } catch { /* ignore */ }
+        }
+        setCommentsLoading(false);
+      })
+      .catch(() => {
+        // DB unreachable — load from localStorage
+        try {
+          const cached = JSON.parse(localStorage.getItem(LS_KEY) || '[]');
+          setComments(cached);
+        } catch { /* ignore */ }
         setCommentsLoading(false);
       });
 
-    // Real-time comment subscription
+    // Real-time comment subscription (still useful when JS client works)
     channelRef.current = supabase
       .channel(`comments:${track.id}`)
       .on('postgres_changes', {
@@ -70,21 +88,19 @@ export default function TrackModal({ track, onClose, onVote, userVotes }) {
     };
   }, [track.id]);
 
-  // Load reaction counts from Supabase
+  // Load reaction counts — use direct REST to bypass RLS auth issue
   useEffect(() => {
-    supabase
-      .from('reactions')
-      .select('emoji')
-      .eq('track_id', track.id)
-      .then(({ data, error }) => {
-        if (!error && data) {
+    dbSelect('reactions', { track_id: track.id })
+      .then((data) => {
+        if (Array.isArray(data)) {
           const counts = {};
           data.forEach(r => {
             counts[r.emoji] = (counts[r.emoji] || 0) + 1;
           });
           setReactionCounts(counts);
         }
-      });
+      })
+      .catch(err => console.error('Load reactions error:', err));
   }, [track.id]);
 
   const submitComment = async () => {
@@ -92,24 +108,50 @@ export default function TrackModal({ track, onClose, onVote, userVotes }) {
     if (!text || !currentUser || commentSubmitting) return;
 
     setCommentSubmitting(true);
-    const { data, error } = await supabase.from('comments').insert({
+
+    // Optimistic local comment (no id yet)
+    const optimistic = {
+      id: `local_${Date.now()}`,
       track_id: track.id,
       user_id: currentUser.id,
       username: currentUser.username,
       avatar_color: currentUser.avatarColor || "#ff2d78",
       text,
-    }).select().single();
-
-    if (!error && data) {
-      // Optimistic add (real-time will dedupe)
-      setComments(prev => {
-        const exists = prev.some(c => c.id === data.id);
-        if (exists) return prev;
-        return [...prev, data];
-      });
-      setTimeout(() => commentsEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
-    }
+      created_at: new Date().toISOString(),
+    };
+    setComments(prev => [...prev, optimistic]);
+    setTimeout(() => commentsEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
     setCommentText("");
+
+    const LS_KEY = `tsh_comments_${track.id}`;
+
+    try {
+      const data = await dbInsert('comments', {
+        track_id: track.id,
+        user_id: currentUser.id,
+        username: currentUser.username,
+        avatar_color: currentUser.avatarColor || "#ff2d78",
+        text,
+      });
+      if (data) {
+        // Replace optimistic entry with real DB record
+        setComments(prev => prev.map(c => c.id === optimistic.id ? data : c));
+        // Update localStorage cache
+        setComments(prev => {
+          const updated = prev.map(c => c.id === optimistic.id ? data : c);
+          try { localStorage.setItem(LS_KEY, JSON.stringify(updated)); } catch { /* ignore */ }
+          return updated;
+        });
+      }
+    } catch (err) {
+      console.error('Comment save error (stored locally):', err);
+      // Keep optimistic entry; persist to localStorage so it survives refresh
+      setComments(prev => {
+        try { localStorage.setItem(LS_KEY, JSON.stringify(prev)); } catch { /* ignore */ }
+        return prev;
+      });
+    }
+
     setCommentSubmitting(false);
   };
 

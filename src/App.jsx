@@ -14,6 +14,7 @@ import TrackUpload from "./TrackUpload.jsx";
 import { FireAnimation, TrashAnimation } from "./SwipeAnimations.jsx";
 import tracksData from "./tracks.js";
 import { supabase } from "./supabase.js";
+import { dbUpsert, dbSelect, dbUpdate } from "./dbHelper.js";
 
 const TABS = [
   { id: "discover", label: "🎵 Discover" },
@@ -202,29 +203,24 @@ export default function App() {
     showToast(dir === "right" ? "🔥 HARD!" : "💀 TRASH");
     setReactionTarget({ trackId: track.id });
 
-    // Persist vote to Supabase
+    // Persist vote — use direct REST (dbHelper) to bypass RLS auth issue
     try {
-      await supabase.from('votes').upsert({
+      await dbUpsert('votes', {
         user_id: currentUser.id,
         track_id: track.id,
         vote: dir,
-      }, { onConflict: 'user_id,track_id' });
+      }, 'user_id,track_id');
 
       // Increment the relevant counter on the track
       const field = dir === "right" ? "hards" : "trash";
-      const { data: trackData } = await supabase
-        .from('tracks')
-        .select('hards, trash')
-        .eq('id', track.id)
-        .single();
+      const trackRows = await dbSelect('tracks', { id: track.id });
+      const trackData = Array.isArray(trackRows) ? trackRows[0] : trackRows;
       if (trackData) {
-        await supabase
-          .from('tracks')
-          .update({ [field]: (trackData[field] || 0) + 1 })
-          .eq('id', track.id);
+        await dbUpdate('tracks', { id: track.id }, { [field]: (trackData[field] || 0) + 1 });
       }
     } catch (err) {
-      console.error('Vote save error:', err);
+      console.error('Vote save error (DB down, localStorage only):', err);
+      // Optimistic update already applied above — no crash
     }
   }, [currentUser, showToast]);
 

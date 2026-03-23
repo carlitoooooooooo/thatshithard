@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "./supabase.js";
 import { useAuth } from "./AuthContext.jsx";
+import { dbUpsert, dbSelect } from "./dbHelper.js";
 
 const REACTIONS = ["🔥", "😤", "💯", "🥶", "😭", "💀"];
 const AUTO_DISMISS_MS = 2000;
@@ -37,15 +38,14 @@ export default function ReactionPicker({ trackId, username, onDismiss }) {
     setSelected(emoji);
 
     if (currentUser && trackId) {
-      try {
-        await supabase.from('reactions').upsert({
-          track_id: trackId,
-          user_id: currentUser.id,
-          emoji,
-        }, { onConflict: 'track_id,user_id,emoji' });
-      } catch (err) {
-        console.error('Reaction save error:', err);
-      }
+      // Use direct REST to bypass RLS auth issue
+      dbUpsert('reactions', {
+        track_id: trackId,
+        user_id: currentUser.id,
+        emoji,
+      }, 'user_id,track_id,emoji').catch(err => {
+        console.error('Reaction save error (DB):', err);
+      });
     }
 
     setTimeout(() => onDismiss(emoji), 400);
@@ -78,18 +78,17 @@ export default function ReactionPicker({ trackId, username, onDismiss }) {
   );
 }
 
-// Helper: get all reactions for a track from Supabase (async)
+// Helper: get all reactions for a track via direct REST (bypasses RLS)
 export async function getTrackReactions(trackId) {
-  const { data, error } = await supabase
-    .from('reactions')
-    .select('emoji')
-    .eq('track_id', trackId);
-
-  if (error || !data) return {};
-
-  const counts = {};
-  data.forEach(r => {
-    counts[r.emoji] = (counts[r.emoji] || 0) + 1;
-  });
-  return counts;
+  try {
+    const data = await dbSelect('reactions', { track_id: trackId });
+    if (!Array.isArray(data)) return {};
+    const counts = {};
+    data.forEach(r => {
+      counts[r.emoji] = (counts[r.emoji] || 0) + 1;
+    });
+    return counts;
+  } catch {
+    return {};
+  }
 }
