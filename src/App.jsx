@@ -160,12 +160,11 @@ export default function App() {
   useEffect(() => {
     if (!currentUser || tracksLoading || tracks.length === 0) return;
 
-    const seen = loadSeen(currentUser.username);
-    const votedIds = Object.keys(userVotes).map(String);
-    const seenSet = new Set([...seen.map(String), ...votedIds]);
-
-    const unseen = tracks.filter(t => !seenSet.has(String(t.id)));
-    const shuffled = [...unseen].sort(() => Math.random() - 0.5);
+    // Only filter out tracks the user has voted on — not just "seen"
+    // This ensures uploaded tracks always show up
+    const votedIds = new Set(Object.keys(userVotes).map(String));
+    const unvoted = tracks.filter(t => !votedIds.has(String(t.id)));
+    const shuffled = [...unvoted].sort(() => Math.random() - 0.5);
     setQueue(shuffled);
   }, [currentUser?.id, tracksLoading, tracks.length > 0, Object.keys(userVotes).length]);
 
