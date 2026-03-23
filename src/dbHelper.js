@@ -24,11 +24,12 @@ export async function dbInsert(table, data) {
   return Array.isArray(json) ? json[0] : json;
 }
 
-export async function dbSelect(table, filters = {}) {
+export async function dbSelect(table, filters = {}, order = 'created_at.asc') {
   const params = Object.entries(filters)
     .map(([k, v]) => `${k}=eq.${encodeURIComponent(v)}`)
     .join('&');
-  const url = `${SUPABASE_URL}/rest/v1/${table}?${params}&order=created_at.asc`;
+  const sep = params ? '&' : '';
+  const url = `${SUPABASE_URL}/rest/v1/${table}?${params}${sep}order=${order}`;
   const res = await fetch(url, {
     headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}` },
   });

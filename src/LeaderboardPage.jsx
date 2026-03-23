@@ -7,7 +7,7 @@ const RANK_STYLE = {
   3: { label: "🥉", color: "#cd7f32", border: "2px solid #cd7f32" },
 };
 
-export default function LeaderboardPage({ tracks, onVote, userVotes }) {
+export default function LeaderboardPage({ tracks, onVote, userVotes, onViewUser }) {
   const [selectedTrack, setSelectedTrack] = useState(null);
 
   const sorted = [...tracks].sort((a, b) => b.hards - a.hards);
@@ -63,6 +63,7 @@ export default function LeaderboardPage({ tracks, onVote, userVotes }) {
           onClose={() => setSelectedTrack(null)}
           onVote={(dir, track) => { onVote(dir, track); setSelectedTrack(null); }}
           userVotes={userVotes}
+          onViewUser={onViewUser}
         />
       )}
     </div>

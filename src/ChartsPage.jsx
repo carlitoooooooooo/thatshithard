@@ -7,7 +7,7 @@ const RANK_STYLE = {
   3: { label: "#3", color: "#cd7f32", border: "2px solid #cd7f32", bg: "rgba(205,127,50,0.06)" },
 };
 
-export default function ChartsPage({ tracks, onVote, userVotes }) {
+export default function ChartsPage({ tracks, onVote, userVotes, onViewUser }) {
   const [selectedTrack, setSelectedTrack] = useState(null);
 
   // Filter to "this week" — last 7 days
@@ -77,6 +77,7 @@ export default function ChartsPage({ tracks, onVote, userVotes }) {
           onClose={() => setSelectedTrack(null)}
           onVote={(dir, track) => { onVote(dir, track); setSelectedTrack(null); }}
           userVotes={userVotes}
+          onViewUser={onViewUser}
         />
       )}
     </div>

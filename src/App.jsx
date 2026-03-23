@@ -11,15 +11,18 @@ import Background from "./Background.jsx";
 import ReactionPicker from "./ReactionPicker.jsx";
 import GraffitiLogo from "./GraffitiLogo.jsx";
 import TrackUpload from "./TrackUpload.jsx";
+import NotificationsPage from "./NotificationsPage.jsx";
+import UserProfilePage from "./UserProfilePage.jsx";
 import { FireAnimation, TrashAnimation } from "./SwipeAnimations.jsx";
 import tracksData from "./tracks.js";
 import { supabase } from "./supabase.js";
-import { dbUpsert, dbSelect, dbUpdate } from "./dbHelper.js";
+import { dbUpsert, dbSelect, dbUpdate, dbInsert } from "./dbHelper.js";
 
 const TABS = [
   { id: "discover", label: "🎵 Discover" },
   { id: "leaderboard", label: "🔥 Board" },
   { id: "charts", label: "📊 Charts" },
+  { id: "notifications", label: "🔔" },
   { id: "profile", label: "👤 Profile" },
 ];
 
@@ -97,7 +100,11 @@ export default function App() {
   const [activeGenre, setActiveGenre] = useState("ALL");
   const [reactionTarget, setReactionTarget] = useState(null);
   const [showUpload, setShowUpload] = useState(false);
+  const [viewingUser, setViewingUser] = useState(null);
+  const [deepLinkTrack, setDeepLinkTrack] = useState(null);
+  const [unreadCount, setUnreadCount] = useState(0);
   const toastTimer = useRef(null);
+  const notifTimer = useRef(null);
 
   // Load tracks — always fetch fresh from DB, no cache
   useEffect(() => {
@@ -156,6 +163,35 @@ export default function App() {
 
     loadUserVotes();
   }, [currentUser?.id]);
+
+  // Load unread notification count
+  const loadUnreadCount = useCallback(async () => {
+    if (!currentUser?.username) return;
+    try {
+      const data = await dbSelect('notifications', { user_username: currentUser.username, read: false });
+      if (Array.isArray(data)) setUnreadCount(data.length);
+    } catch {}
+  }, [currentUser?.username]);
+
+  useEffect(() => {
+    loadUnreadCount();
+    if (notifTimer.current) clearInterval(notifTimer.current);
+    notifTimer.current = setInterval(loadUnreadCount, 30000);
+    return () => { if (notifTimer.current) clearInterval(notifTimer.current); };
+  }, [loadUnreadCount]);
+
+  // Deep link: /track/:id
+  useEffect(() => {
+    const match = window.location.pathname.match(/^\/track\/([^/]+)/);
+    if (match && tracks.length > 0) {
+      const trackId = match[1];
+      const found = tracks.find(t => String(t.id) === trackId);
+      if (found) {
+        setDeepLinkTrack(found);
+        history.replaceState(null, '', '/');
+      }
+    }
+  }, [tracks]);
 
   // Build queue once tracks and votes are loaded
   useEffect(() => {
@@ -217,6 +253,22 @@ export default function App() {
       const trackData = Array.isArray(trackRows) ? trackRows[0] : trackRows;
       if (trackData) {
         await dbUpdate('tracks', { id: track.id }, { [field]: (trackData[field] || 0) + 1 });
+      }
+
+      // Send "hard" notification to uploader (not to yourself)
+      if (dir === "right" && track.uploadedBy && track.uploadedBy !== currentUser.username) {
+        try {
+          await dbInsert('notifications', {
+            user_username: track.uploadedBy,
+            type: 'hard',
+            from_username: currentUser.username,
+            track_id: track.id,
+            track_title: track.title,
+            message: `${currentUser.username} hard'd your track "${track.title}"`,
+          });
+        } catch (err) {
+          console.error('Notification insert error:', err);
+        }
       }
     } catch (err) {
       console.error('Vote save error (DB down, localStorage only):', err);
@@ -367,6 +419,7 @@ export default function App() {
             tracks={tracks}
             onVote={handleVoteFromModal}
             userVotes={userVotes}
+            onViewUser={setViewingUser}
           />
         )}
 
@@ -375,6 +428,13 @@ export default function App() {
             tracks={tracks}
             onVote={handleVoteFromModal}
             userVotes={userVotes}
+            onViewUser={setViewingUser}
+          />
+        )}
+
+        {activeTab === "notifications" && (
+          <NotificationsPage
+            onNotificationsRead={loadUnreadCount}
           />
         )}
 
@@ -389,8 +449,12 @@ export default function App() {
             key={tab.id}
             className={`nav-tab ${activeTab === tab.id ? "nav-tab--active" : ""}`}
             onClick={() => setActiveTab(tab.id)}
+            style={{ position: "relative" }}
           >
             {tab.label}
+            {tab.id === "notifications" && unreadCount > 0 && (
+              <span className="notif-badge">{unreadCount > 9 ? "9+" : unreadCount}</span>
+            )}
           </button>
         ))}
       </nav>
@@ -416,6 +480,27 @@ export default function App() {
             />
           </div>
         </div>
+      )}
+
+      {/* Deep link: track modal */}
+      {deepLinkTrack && (
+        <TrackModal
+          track={deepLinkTrack}
+          onClose={() => setDeepLinkTrack(null)}
+          onVote={handleVoteFromModal}
+          userVotes={userVotes}
+          onViewUser={(username) => { setDeepLinkTrack(null); setViewingUser(username); }}
+        />
+      )}
+
+      {/* User profile overlay */}
+      {viewingUser && (
+        <UserProfilePage
+          username={viewingUser}
+          onClose={() => setViewingUser(null)}
+          onOpenModal={(track) => { setViewingUser(null); setDeepLinkTrack(track); }}
+          userVotes={userVotes}
+        />
       )}
     </div>
   );

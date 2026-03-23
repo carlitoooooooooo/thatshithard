@@ -5,6 +5,14 @@ import { useAuth } from "./AuthContext.jsx";
 import { supabase } from "./supabase.js";
 import { dbInsert, dbSelect, dbUpsert } from "./dbHelper.js";
 
+async function insertNotification(data) {
+  try {
+    await dbInsert('notifications', data);
+  } catch (err) {
+    console.error('Notification insert error:', err);
+  }
+}
+
 const REACTIONS_EMOJIS = ["🔥", "😤", "💯", "🥶", "😭", "💀"];
 
 function timeAgo(iso) {
@@ -15,9 +23,11 @@ function timeAgo(iso) {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-export default function TrackModal({ track, onClose, onVote, userVotes }) {
+export default function TrackModal({ track, onClose, onVote, userVotes, onViewUser }) {
   const { currentUser } = useAuth();
   const [isPlaying, setIsPlaying] = useState(false);
+  const [shareToast, setShareToast] = useState("");
+  const shareToastTimer = useRef(null);
   const [progress, setProgress] = useState(0);
   const playerRef = useRef(null);
   const [reactionCounts, setReactionCounts] = useState({});
@@ -85,6 +95,7 @@ export default function TrackModal({ track, onClose, onVote, userVotes }) {
         playerRef.current.destroy();
         playerRef.current = null;
       }
+      if (shareToastTimer.current) clearTimeout(shareToastTimer.current);
     };
   }, [track.id]);
 
@@ -143,6 +154,17 @@ export default function TrackModal({ track, onClose, onVote, userVotes }) {
           return updated;
         });
       }
+      // Send notification to track uploader (not to yourself)
+      if (track.uploadedBy && track.uploadedBy !== currentUser.username) {
+        insertNotification({
+          user_username: track.uploadedBy,
+          type: 'comment',
+          from_username: currentUser.username,
+          track_id: track.id,
+          track_title: track.title,
+          message: `${currentUser.username} commented on "${track.title}"`,
+        });
+      }
     } catch (err) {
       console.error('Comment save error (stored locally):', err);
       // Keep optimistic entry; persist to localStorage so it survives refresh
@@ -187,6 +209,35 @@ export default function TrackModal({ track, onClose, onVote, userVotes }) {
 
   const hasReactions = Object.keys(reactionCounts).length > 0;
 
+  async function handleShare() {
+    const url = `https://thatshithard.vercel.app/track/${track.id}`;
+    const shareData = {
+      title: track.title,
+      text: `Check out "${track.title}" by ${track.artist} on ThatShitHard`,
+      url,
+    };
+    let msg = "🔗 Link copied!";
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+        msg = "📤 Shared!";
+      } else {
+        await navigator.clipboard.writeText(url);
+        msg = "🔗 Link copied!";
+      }
+    } catch {
+      try {
+        await navigator.clipboard.writeText(url);
+        msg = "🔗 Link copied!";
+      } catch {
+        msg = "🔗 " + url;
+      }
+    }
+    setShareToast(msg);
+    if (shareToastTimer.current) clearTimeout(shareToastTimer.current);
+    shareToastTimer.current = setTimeout(() => setShareToast(""), 2000);
+  }
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="track-modal" onClick={(e) => e.stopPropagation()}>
@@ -204,7 +255,15 @@ export default function TrackModal({ track, onClose, onVote, userVotes }) {
 
           <div className="track-modal__meta">
             <span>{track.bpm} BPM</span>
-            <span>by @{track.uploadedBy}</span>
+            <span>
+              by{" "}
+              <span
+                className="track-modal__uploader-link"
+                onClick={() => onViewUser && onViewUser(track.uploadedBy)}
+              >
+                @{track.uploadedBy}
+              </span>
+            </span>
           </div>
 
           <div className="track-modal__tags">
@@ -268,6 +327,19 @@ export default function TrackModal({ track, onClose, onVote, userVotes }) {
               {userVote === "right" ? "🔥 You said HARD" : "💀 You said TRASH"}
             </div>
           )}
+
+          {/* Share button */}
+          <div style={{ marginTop: "10px", position: "relative" }}>
+            <button
+              className="btn-bevel track-modal__share-btn"
+              onClick={handleShare}
+            >
+              📤 SHARE
+            </button>
+            {shareToast && (
+              <div className="share-toast">{shareToast}</div>
+            )}
+          </div>
 
           {/* Comments */}
           <div className="comments-section">
