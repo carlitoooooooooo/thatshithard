@@ -107,14 +107,26 @@ function MP3Tab({ onSubmit, onCancel }) {
       }
 
       setProgress("Saving...");
-      const { data: track, error: te } = await supabase.from("tracks").insert({
+      const trackPayload = {
         title: title.trim(), artist: artist.trim() || currentUser.username,
         genre, bpm: 0, cover_url: coverUrl, audio_url: audioUrl,
         snippet_start: 0, tags: [genre.toLowerCase()],
-        uploaded_by: currentUser.id, uploaded_by_username: currentUser.username,
+        uploaded_by_username: currentUser.username,
         hards: 0, trash: 0, listed_at: new Date().toISOString(),
-      }).select().single();
-      if (te) throw new Error(te.message);
+      };
+      const trackRes = await fetch(`${SUPABASE_URL}/rest/v1/tracks`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation',
+        },
+        body: JSON.stringify(trackPayload),
+      });
+      const trackJson = await trackRes.json();
+      if (!trackRes.ok) throw new Error(trackJson?.message || trackJson?.error || "Failed to save track");
+      const track = Array.isArray(trackJson) ? trackJson[0] : trackJson;
 
       onSubmit({ id: track.id, title: track.title, artist: track.artist, genre: track.genre,
         bpm: 0, coverUrl: track.cover_url, audioUrl: track.audio_url, snippetStart: 0,
@@ -203,17 +215,29 @@ function SoundCloudTab({ onSubmit, onCancel }) {
     setSaving(true); setError("");
     try {
       const embedUrl = buildSCEmbedUrl(url);
-      const { data: track, error: te } = await supabase.from("tracks").insert({
+      const scPayload = {
         title: title.trim(), artist: artist.trim() || currentUser.username,
         genre, bpm: 0,
         cover_url: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80",
-        audio_url: url, // store SC url as audio_url
+        audio_url: url,
         snippet_start: 0, tags: [genre.toLowerCase()],
-        uploaded_by: currentUser.id, uploaded_by_username: currentUser.username,
+        uploaded_by_username: currentUser.username,
         hards: 0, trash: 0, listed_at: new Date().toISOString(),
         soundcloud_url: url, embed_url: embedUrl,
-      }).select().single();
-      if (te) throw new Error(te.message);
+      };
+      const scRes = await fetch(`${SUPABASE_URL}/rest/v1/tracks`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation',
+        },
+        body: JSON.stringify(scPayload),
+      });
+      const scJson = await scRes.json();
+      if (!scRes.ok) throw new Error(scJson?.message || scJson?.error || "Failed to save track");
+      const track = Array.isArray(scJson) ? scJson[0] : scJson;
 
       onSubmit({ id: track.id, title: track.title, artist: track.artist, genre: track.genre,
         bpm: 0, coverUrl: track.cover_url, audioUrl: track.audio_url,
